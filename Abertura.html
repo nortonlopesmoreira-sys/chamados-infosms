@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Abertura de Chamado</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
+        body { background: #edf2f7; padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .card-abertura { background: white; padding: 35px; border-radius: 18px; width: 100%; max-width: 650px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); border-top: 6px solid #05316e; }
+        .header-abertura { text-align: center; margin-bottom: 25px; }
+        
+        /* Estilização da logo da prefeitura */
+        .logo-abertura { width: 120px; height: auto; margin-bottom: 15px; }
+        
+        .header-abertura h1 { color: #05316e; font-size: 24px; margin-bottom: 8px; }
+        .header-abertura p { color: #64748b; font-size: 14px; }
+        .campo { display: flex; flex-direction: column; margin-bottom: 18px; }
+        .campo label { font-weight: bold; color: #05316e; margin-bottom: 8px; font-size: 14px; }
+        .campo input, .campo textarea { padding: 14px; border: 1px solid #cbd5e1; border-radius: 10px; font-size: 14px; width: 100%; }
+        .campo textarea { min-height: 110px; resize: vertical; }
+        
+        /* BOTÃO E ESTILOS DE CARREGAMENTO */
+        .btn-enviar { 
+            width: 100%; 
+            padding: 15px; 
+            background: #05316e; 
+            color: white; 
+            border: none; 
+            border-radius: 10px; 
+            font-size: 16px; 
+            font-weight: bold; 
+            cursor: pointer; 
+            transition: background 0.2s; 
+            margin-top: 10px; 
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+        }
+        .btn-enviar:hover { background: #031e45; }
+        
+        /* Estado quando o botão está desativado (carregando) */
+        .btn-enviar:disabled {
+            background: #64748b;
+            cursor: not-allowed;
+        }
+
+        /* O círculo giratório de carregamento (oculto por padrão) */
+        .loader {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: girar 0.8s linear infinite;
+        }
+
+        /* Animação que faz o círculo rodar */
+        @keyframes girar {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+
+<div class="card-abertura">
+    <div class="header-abertura">
+        <img src="Imagens/prefeitura.png" alt="Logo Prefeitura" class="logo-abertura">
+        <h1>Abertura de Chamado Técnico</h1>
+        <p>Preencha os dados abaixo para solicitar suporte da Informática</p>
+    </div>
+
+    <form id="formAbertura">
+        <div class="campo">
+            <label for="setor">Seu Setor / Unidade</label>
+            <input type="text" id="setor" required placeholder="Clique para ver a lista ou digite para procurar..." list="listaSetores" autocomplete="off">
+            <datalist id="listaSetores"></datalist>
+        </div>
+
+        <div class="campo">
+            <label for="requisitante">Seu Nome (Solicitante)</label>
+            <input type="text" id="requisitante" required placeholder="Digite seu nome completo">
+        </div>
+
+        <div class="campo">
+            <label for="problema">Descrição do Problema</label>
+            <textarea id="problema" required placeholder="Descreva detalhadamente o que está acontecendo..."></textarea>
+        </div>
+
+        <button type="submit" id="btnEnviar" class="btn-enviar">
+            <span class="loader" id="loaderBtn"></span>
+            <span id="textoBtn">Enviar Solicitação</span>
+        </button>
+    </form>
+</div>
+
+<script>
+// URL da sua API do Google Apps Script
+const API_URL = "https://script.google.com/macros/s/AKfycbyDlsl_eJ4xdOhtuS--KbSpF66HVkpS95bZXza-2VD4PKG5Vx9oIGpyHQ_QNfTDpUlbAQ/exec";
+
+// 1. FUNÇÃO PARA POPULAR A DATALIST DINAMICAMENTE
+async function carregarSetoresDinamicos() {
+    const dataListSetores = document.getElementById('listaSetores');
+    try {
+        const response = await fetch(`${API_URL}?acao=listarSetores`);
+        if (response.ok) {
+            const setores = await response.json();
+            dataListSetores.innerHTML = '';
+            setores.forEach(setor => {
+                const option = document.createElement('option');
+                option.value = setor; 
+                dataListSetores.appendChild(option);
+            });
+            console.log("Setores carregados com sucesso da planilha!");
+        }
+    } catch (erro) {
+        console.error("Erro ao carregar setores da planilha:", erro);
+    }
+}
+
+window.addEventListener('DOMContentLoaded', carregarSetoresDinamicos);
+
+
+// 2. FUNÇÃO DO ENVIO DO FORMULÁRIO COM CARREGAMENTO
+document.getElementById('formAbertura').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    // Mapeamento dos elementos do botão para controle do carregamento
+    const btnEnviar = document.getElementById('btnEnviar');
+    const loaderBtn = document.getElementById('loaderBtn');
+    const textoBtn = document.getElementById('textoBtn');
+
+    // ATIVAR CARREGAMENTO: Desativa botão, mostra o círculo e muda o texto
+    btnEnviar.disabled = true;
+    loaderBtn.style.display = 'inline-block';
+    textoBtn.textContent = 'Enviando chamado...';
+
+    const setorDigitado = document.getElementById('setor').value;
+    const requisitanteDigitado = document.getElementById('requisitante').value;
+    const problemaDigitado = document.getElementById('problema').value;
+
+    const dadosChamado = {
+        setor: setorDigitado,
+        requisitante: requisitanteDigitado,
+        problema: problemaDigitado
+    };
+
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            redirect: 'follow',
+            body: JSON.stringify(dadosChamado)
+        });
+
+        const resultado = await response.json();
+
+        if (resultado.sucesso) {
+            const idGerado = resultado.id; 
+            const dataAtual = new Date().toLocaleDateString('pt-BR');
+
+            alert(`Chamado registrado com sucesso! Código: ${idGerado}`);
+
+            // Código original de impressão do Protocolo
+            const janelaImpressao = window.open('', '_blank', 'width=800,height=600');
+            if (janelaImpressao) {
+                const htmlProtocolo = `
+                <!DOCTYPE html>
+                <html lang="pt-br">
+                <head>
+                    <meta charset="UTF-8">
+                    <title>Protocolo de Chamado #${idGerado}</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; padding: 40px; color: #333; background: #fff; }
+                        .comprovante { border: 2px dashed #05316e; padding: 30px; max-width: 600px; margin: 0 auto; border-radius: 8px; }
+                        .topo-comp { text-align: center; border-bottom: 2px solid #05316e; padding-bottom: 15px; margin-bottom: 20px; }
+                        .topo-comp h2 { color: #05316e; margin: 0; font-size: 22px; }
+                        .topo-comp p { margin: 5px 0 0 0; color: #666; font-size: 14px; }
+                        .linha-dado { margin-bottom: 12px; font-size: 15px; }
+                        .bloco-problema { background: #f8fafc; border-left: 4px solid #05316e; padding: 15px; margin-top: 20px; border-radius: 0 4px 4px 0; }
+                        .bloco-problema dashed { font-weight: bold; display: block; margin-bottom: 5px; }
+                        .rodape { text-align: center; font-size: 12px; color: #64748b; margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 15px; }
+                        @media print { body { padding: 0; } .comprovante { border: 2px dashed #000; box-shadow: none; } }
+                    </style>
+                </head>
+                <body>
+                    <div class="comprovante">
+                        <div class="topo-comp">
+                            <h2>PROTOCOLO DE CHAMADO</h2>
+                            <p>Controle de Atendimento Técnico</p>
+                        </div>
+                        <div class="linha-dado"><strong>Número do Chamado:</strong> #${idGerado}</div>
+                        <div class="linha-dado"><strong>Data de Abertura:</strong> ${dataAtual}</div>
+                        <div class="linha-dado"><strong>Requisitante:</strong> ${requisitanteDigitado}</div>
+                        <div class="linha-dado"><strong>Setor/Unidade:</strong> ${setorDigitado}</div>
+                        <div class="linha-dado"><strong>Status Inicial:</strong> Aguardando Atendimento</div>
+
+                        <div class="bloco-problema">
+                            <strong>Descrição do Problema Relatado:</strong>
+                            <p>${problemaDigitado}</p>
+                        </div>
+
+                        <div class="rodape">
+                            Este é um documento de controle interno. Aguarde o atendimento do técnico responsável.
+                        </div>
+                    </div>
+
+                    <script>
+                        window.onload = function() { 
+                            window.print(); 
+                            setTimeout(() => { window.close(); }, 500); 
+                        }
+                    <\/script>
+                </body>
+                </html>
+                `;
+
+                janelaImpressao.document.write(htmlProtocolo);
+                janelaImpressao.document.close();
+            }
+
+            document.getElementById('formAbertura').reset();
+        } else {
+            alert('Erro ao tentar registrar o chamado na planilha: ' + resultado.erro);
+        }
+    } catch (erro) {
+        console.error('Erro de conexão:', erro);
+        alert('Não foi possível conectar ao banco de dados na planilha.');
+    } finally {
+        // FINALIZAR CARREGAMENTO: Restaura o botão ao estado original independente de dar certo ou erro
+        btnEnviar.disabled = false;
+        loaderBtn.style.display = 'none';
+        textoBtn.textContent = 'Enviar Solicitação';
+    }
+});
+</script>
+</body>
+</html>
